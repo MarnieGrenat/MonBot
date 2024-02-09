@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MQTT Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #282c35;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    header {
+      position: fixed;
+      top: 0;
+      background-color: #007bff;
+      padding: 20px;
+      text-align: center;
+      border-radius: 0 0 12px 12px;
+    }
+
+    h1 {
+      color: #fff;
+      margin: 0;
+    }
+
+    .container {
+      width: 80%;
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      margin-top: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      max-height: 70vh;
+      /* Define uma altura máxima para o container */
+      align-items: center;
+    }
+
+    .tabs {
+      display: flex;
+      background-color: #007bff;
+      border-radius: 12px 12px 0 0;
+      overflow: hidden;
+      position: absolute;
+      width: 100%;
+      top: 0;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 15px;
+      text-align: center;
+      cursor: pointer;
+      color: #fff;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+
+    .tab:hover {
+      background-color: #0056b3;
+    }
+
+    #liveDataTab {
+      background-color: #0056b3;
+    }
+
+    .terminal {
+      width: 100%;
+      border-radius: 3px;
+      border: 2px solid #3d3d3d;
+      background-color: #f2f2f2;
+      opacity: 0.9;
+      height: 340px;
+      word-wrap: break-word;
+      border-bottom-left-radius: 5px;
+      border-bottom-right-radius: 5px;
+      overflow-y: scroll;
+
+    }
+
+    .terminal p {
+      color: #000000;
+      font-weight: 200;
+      font-size: 14px;
+    }
+
+    .terminal div {
+      display: inline-block;
+    }
+
+    .terminal .static {
+      color: #5ed7ff;
+      font-weight: bold;
+    }
+
+    #terminalText {
+      color: #000;
+      /* Define a cor do texto como preto */
+    }
+
+    #settingsTab {
+      background-color: #007bff;
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      /* Alterado para auto para permitir rolagem quando necessário */
+      padding: 20px;
+      background-color: #282c35;
+      border-radius: 0 0 12px 12px;
+      position: absolute;
+      width: 100%;
+      bottom: 0;
+      top: 50px;
+      transition: top 0.3s ease;
+    }
+
+    .tab-content.up {
+      top: 50px;
+    }
+
+    p {
+      margin: 0 0 10px;
+      line-height: 1.5;
+      color: #fff;
+    }
+
+    form {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      max-width: 800px;
+      /* Ajuste conforme necessário */
+      margin: 0 auto;
+    }
+
+    .settings-container {
+      width: 800px;
+      height: 190px;
+      padding: 35px 15px 5px;
+    }
+
+    .settings-container:before,
+    .settings-container:after {
+      content: "";
+      display: table;
+      clear: both;
+    }
+
+    .settings-container div {
+      float: left;
+      width: 180px;
+      height: 160px;
+    }
+
+    #mqtt-box {
+      margin-left: 20px;
+      margin-right: 20px;
+    }
+
+    .config-form {
+      width: calc(50% - 10px);
+      box-sizing: border-box;
+      margin-right: 10px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input {
+      width: calc(100% - 10px);
+      padding: 8px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #007bff;
+      color: #fff;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 10px;
+      background-color: #363b48;
+      color: #fff;
+      border-radius: 12px;
+      width: 100%;
+      position: fixed;
+      bottom: 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>MQTT Dashboard</h1>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <div id="liveDataTab" class="tab">Live Data</div>
+      <div id="settingsTab" class="tab">Device Settings</div>
+    </div>
+
+    <div id="liveDataContent" class="tab-content">
+      <h2 style="margin: 0; padding: 20px; background-color: #007bff; color: #fff;">Live Sensor Data</h2>
+      <div id="messages">
+        <section id=connModeContainer style="margin:10px;border:.2px ">
+          <section class=grid-container-1-div style=margin:8px>
+            <h2 class=text>Terminal</h2>
+            <div class=grid-item>
+              <div class=container-flex>
+                <div id="terminal" class="terminal">
+                  <div id="terminalText"></div>
+                </div>
+                <br>
+                <button id=exportLog
+                  style="padding:8px 16px;border:0;background:#007bff;color:#f2f2f2;letter-spacing:.03em;border-radius:3px"
+                  onclick=exportLog()>Exportar Log</button>
+                <br>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+    </div>
+
+    <div id="settingsContent" class="tab-content" style="display: none;">
+      <h2 style="margin: 0; padding: 20px; background-color: #007bff; color: #fff;;">Device Settings</h2>
+      <br>
+      <div class="settings-container">
+        <div id="mqtt-box">
+          <h3> MQTT Cofiguration</h3>
+          <form id="configForm" onsubmit="saveConfig(); return false;">
+            <label for="mqttServer">MQTT Server:</label>
+            <input type="text" id="mqttServer" name="mqttServer" required>
+
+            <label for="mqttPort">MQTT Port:</label>
+            <input type="number" id="mqttPort" name="mqttPort" required>
+
+            <label for="mqttUsername">MQTT Username:</label>
+            <input type="text" id="mqttUsername" name="mqttUsername" required>
+
+            <label for="mqttPassword">MQTT Password:</label>
+            <input type="password" id="mqttPassword" name="mqttPassword" required>
+            <button type="submit">Save MQTT Configuration</button>
+          </form>
+        </div>
+
+        <div id="wifi-box">
+          <h3> WiFi Cofiguration</h3>
+          <form id="wifiConfigForm" onsubmit="saveWiFiConfig(); return false;">
+            <label for="wifiSSID">WiFi SSID:</label>
+            <input type="text" id="wifiSSID" name="wifiSSID" required>
+
+            <label for="wifiPassword">WiFi Password:</label>
+            <input type="password" id="wifiPassword" name="wifiPassword" required>
+
+            <label for="apSSID">Access Point SSID:</label>
+            <input type="text" id="apSSID" name="apSSID" required>
+
+            <label for="apPassword">Access Point Password:</label>
+            <input type="password" id="apPassword" name="apPassword" required>
+
+            <button type="submit">Save WiFi Configuration</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Developer: Gabriela Dellamora Paim. Version:1.0.8</p>
+  </footer>
+
+  <script>
+    var messagesContainer = document.getElementById('messages');
+    var liveDataTab = document.getElementById('liveDataTab');
+    var settingsTab = document.getElementById('settingsTab');
+    var liveDataContent = document.getElementById('liveDataContent');
+    var settingsContent = document.getElementById('settingsContent');
+    let exportButton = document.getElementById("exportLog");
+    let autoScroll = true;
+
+    liveDataTab.addEventListener('click', function () {
+      liveDataContent.style.display = 'block';
+      settingsContent.style.display = 'none';
+      liveDataTab.style.backgroundColor = '#0056b3';
+      settingsTab.style.backgroundColor = '#007bff';
+      liveDataContent.classList.add('up');
+    });
+
+    settingsTab.addEventListener('click', function () {
+      liveDataContent.style.display = 'none';
+      settingsContent.style.display = 'block';
+      liveDataTab.style.backgroundColor = '#007bff';
+      settingsTab.style.backgroundColor = '#0056b3';
+      liveDataContent.classList.remove('up');
+    });
+
+    // Terminal
+    let dataReceived = []; // Armazena log
+
+    function requireData() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/getData", true);
+      xhr.setRequestHeader("Accept", "text/plain");
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+          showDataOnTerminal(xhr.responseText);
+        }
+      }
+      xhr.send();
+    }
+
+    function showDataOnTerminal(output) {
+      // Let output= output+"\n";  //Vou dar +="\n"  dentro da função de log do ESP
+      dataReceived.push(output);
+      document.getElementById('terminalText').innerText = dataReceived.join('');
+      if (autoScroll) {
+        scrollDown();
+      }
+    }
+
+    document.getElementById("terminal").onscroll = function () {
+      const scrollingElement = this;
+      // Se a posição de rolagem atual estiver próxima do final da página, pare de rolar
+      autoScroll = (scrollingElement.scrollTop + scrollingElement.offsetHeight >= scrollingElement.scrollHeight - 10);
+    }
+
+    exportLog = function () {
+      let now = new Date();
+      let year = now.getFullYear();
+      let month = String(now.getMonth() + 1).padStart(2, '0');
+      let day = String(now.getDate()).padStart(2, '0');
+      let hour = String(now.getHours()).padStart(2, '0');
+      let minute = String(now.getMinutes()).padStart(2, '0');
+      let second = String(now.getSeconds()).padStart(2, '0');
+
+      let fileName = "Data_" + year + "-" + month + "-" + day + "_" + hour + "-" + minute + "-" + second;
+
+      let list = dataReceived.join('');
+      const blob = new Blob([list], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+    }
+
+    exportButton.addEventListener('click', exportLog);
+
+    simulation = function () {
+      setInterval(function () {
+        showDataOnTerminal('[Sensor/Temp]: Temperature: 25°C\n');
+      }, 1000);
+    }
+    // simulation();
+
+    /* Configurations */
+    function postRequest(request, data) {
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", request, true);
+      xhr.setRequestHeader("Content-Type", "text/plain");
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          alert("Configuração Salva com Sucesso! Dispositivo reiniciando...")
+        } else if (xhr.readyState === 4 && xhr.status != 200) {
+          alert("Erro ao Salvar Configuração. Response:\n" + xhr.responseText);
+        }
+      };
+      xhr.send(JSON.stringify(data));
+    }
+
+    function showMQTTConfig() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/getMqttConfig", true);
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+          var mqttConfig = JSON.parse(xhr.responseText);
+          document.getElementById('mqttServer').value = mqttConfig.mqttServer;
+          document.getElementById('mqttPort').value = mqttConfig.mqttPort;
+          document.getElementById('mqttUsername').value = mqttConfig.mqttUsername;
+          document.getElementById('mqttPassword').value = mqttConfig.mqttPassword;
+        }
+      }
+      xhr.send();
+    }
+    function saveMQTTConfig() {
+      mqttConfig = {
+        "mqttServer": document.getElementById('mqttServer').value,
+        "mqttPort": document.getElementById('mqttPort').value,
+        "mqttUsername": document.getElementById('mqttUsername').value,
+        "mqttPassword": document.getElementById('mqttPassword').value
+      }
+      postRequest("/setMqttConfig", mqttConfig);
+    }
+
+    function showWifiConfig() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/getWiFiConfig", true);
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+          var wifiConfig = JSON.parse(xhr.responseText);
+          document.getElementById('wifiSSID').value = wifiConfig.wifiSSID;
+          document.getElementById('wifiPassword').value = wifiConfig.wifiPassword;
+          document.getElementById('apSSID').value = wifiConfig.apSSID;
+          document.getElementById('apPassword').value = wifiConfig.apPassword;
+        }
+      }
+      xhr.send();
+    }
+
+    function saveWiFiConfig() {
+
+      wifiConfig = {
+        "wifiSSID": document.getElementById('wifiSSID').value,
+        "wifiPassword": document.getElementById('wifiPassword').value,
+        "apSSID": document.getElementById('apSSID').value,
+        "apPassword": document.getElementById('apPassword').value
+      }
+      postRequest("/setWiFiConfig", wifiConfig);
+    }
+  </script>
+
+</body>
+
+</html>

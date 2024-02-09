@@ -1,0 +1,10 @@
+{
+    "wifi": {
+        "ssid": "TESTE",
+        "password": "123321",
+        "apSsid": "accessPointTeste",
+        "apPassword": "123321"
+    }
+}
+
+

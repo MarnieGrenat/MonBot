@@ -1,0 +1,8 @@
+{
+    "mqtt": {
+        "server": "mqtt.yourserver.com.br",
+        "port": 1883,
+        "username": "USER_NAME",
+        "password": "123321"
+    }
+}
