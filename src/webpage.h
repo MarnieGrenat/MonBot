@@ -5,7 +5,7 @@ const  char webpage[] = R"=====(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MQTT Dashboard</title>
+  <title>MonBot</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -219,13 +219,13 @@ const  char webpage[] = R"=====(
 <body>
 
   <header>
-    <h1>MQTT Dashboard</h1>
+    <h1>MonBot Dashboard</h1>
   </header>
 
   <div class="container">
     <div class="tabs">
       <div id="liveDataTab" class="tab">Live Data</div>
-      <div id="settingsTab" class="tab">Device Settings</div>
+      <div id="settingsTab" class="tab">MonBot Settings</div>
     </div>
 
     <div id="liveDataContent" class="tab-content">
@@ -252,43 +252,54 @@ const  char webpage[] = R"=====(
     </div>
 
     <div id="settingsContent" class="tab-content" style="display: none;">
-      <h2 style="margin: 0; padding: 20px; background-color: #007bff; color: #fff;;">Device Settings</h2>
+      <h2 style="margin: 0; padding: 20px; background-color: #007bff; color: #fff;;">MonBot Device Settings</h2>
       <br>
       <div class="settings-container">
         <div id="mqtt-box">
-          <h3> MQTT Cofiguration</h3>
+          <h3> MQTT Settings</h3>
           <form id="configForm" onsubmit="saveConfig(); return false;">
             <label for="mqttServer">MQTT Server:</label>
-            <input type="text" id="mqttServer" name="mqttServer" required>
+            <input type="text" id="mqttServer" name="mqttServer", placeholder="mqtt.broker.io" required>
 
             <label for="mqttPort">MQTT Port:</label>
-            <input type="number" id="mqttPort" name="mqttPort" required>
+            <input type="text" id="mqttPort" name="mqttPort", placeholder="1883" required>
 
             <label for="mqttUsername">MQTT Username:</label>
-            <input type="text" id="mqttUsername" name="mqttUsername" required>
+            <input type="text" id="mqttUsername" name="mqttUsername", placeholder="Username" required>
 
             <label for="mqttPassword">MQTT Password:</label>
-            <input type="password" id="mqttPassword" name="mqttPassword" required>
-            <button type="submit">Save MQTT Configuration</button>
+            <input type="password" id="mqttPassword" name="mqttPassword", placeholder="********" required>
+            <button type="submit">Save MQTT Settings</button>
           </form>
         </div>
 
         <div id="wifi-box">
-          <h3> WiFi Cofiguration</h3>
+          <h3> Wi-Fi Settings</h3>
           <form id="wifiConfigForm" onsubmit="saveWiFiConfig(); return false;">
-            <label for="wifiSSID">WiFi SSID:</label>
-            <input type="text" id="wifiSSID" name="wifiSSID" required>
+            <label for="wifiSSID">Wi-Fi SSID:</label>
+            <input type="text" id="wifiSSID" name="wifiSSID", placeholder="SSID" required>
 
-            <label for="wifiPassword">WiFi Password:</label>
-            <input type="password" id="wifiPassword" name="wifiPassword" required>
+            <label for="wifiPassword">Wi-Fi Password:</label>
+            <input type="password" id="wifiPassword" name="wifiPassword", placeholder="********" required>
 
             <label for="apSSID">Access Point SSID:</label>
-            <input type="text" id="apSSID" name="apSSID" required>
+            <input type="text" id="apSSID" name="apSSID", placeholder="MonBot_AP" required>
 
             <label for="apPassword">Access Point Password:</label>
-            <input type="password" id="apPassword" name="apPassword" required>
+            <input type="password" id="apPassword" name="apPassword", placeholder="********" required>
 
-            <button type="submit">Save WiFi Configuration</button>
+            <button type="submit">Save Wi-Fi Settings</button>
+          </form>
+        </div>
+        <div id="api-box">
+          <h3> Message Settings</h3>
+          <form id="apiConfigForm" onsubmit="saveAPIConfig(); return false;">
+            <label for="apiKey">API Key:</label>
+            <input type="text" id="apiKey" name="apiKey", placeholder="0000000" required>
+
+            <label for="phoneNumber">Phone Number:</label>
+            <input type="tel" id="phoneNumber" name="phoneNumber", placeholder="(55) 55 9 9999-9999" required>
+            <button type="submit">Save API Settings</button>
           </form>
         </div>
       </div>
@@ -296,7 +307,7 @@ const  char webpage[] = R"=====(
   </div>
 
   <footer>
-    <p>Developer: Gabriela Dellamora Paim. Version:1.0.8</p>
+    <p>Developer: Gabriela Dellamora Paim. Version:1.0.9</p>
   </footer>
 
   <script>
@@ -447,6 +458,41 @@ const  char webpage[] = R"=====(
         "apPassword": document.getElementById('apPassword').value
       }
       postRequest("/setWiFiConfig", wifiConfig);
+    }
+
+    function showAPIConfig() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/getAPIConfig", true);
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+          var apiConfig = JSON.parse(xhr.responseText);
+          document.getElementById('apiKey').value = apiConfig.apiKey;
+          document.getElementById('phoneNumber').value = apiConfig.phoneNumber;
+        }
+      }
+      xhr.send();
+    }
+    function saveAPIConfig() {
+      apiConfig = {
+        "apiKey": document.getElementById('apiKey').value,
+        "phoneNumber": document.getElementById('phoneNumber').value
+      }
+      postRequest("/setAPIConfig", apiConfig);
+    }
+    function showAPIConfig()
+    {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/getAPIConfig", true);
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4 && xhr.status == 200) {
+          var apiConfig = JSON.parse(xhr.responseText);
+          document.getElementById('apiKey').value = apiConfig.apiKey;
+          document.getElementById('phoneNumber').value = apiConfig.phoneNumber;
+        }
+      }
+      xhr.send();
     }
   </script>
 

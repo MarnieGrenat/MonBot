@@ -16,8 +16,8 @@ DHT dht(DHTPIN, DHTTYPE);
 void warmUpGasSensor();
 bool alertGasSensor();
 
-const char *topicT = "/temperatura";
-const char *topicH = "/umidade";
+const char *topicT = "/temperature";
+const char *topicH = "/humidity";
 const char *topicG = "/gas";
 
 float_t verifyTemperature()
@@ -34,9 +34,9 @@ void warmUpGasSensor()
 {
   pinMode(DO_PIN, INPUT);
   // ESP_LOGI("Gas Sensor", "Warming up MQ-2 Sensor");
-  Serial.println("Warming up MQ-2 Sensor");
+  ESP_LOGI("Gas Sensor", "Warming up MQ-2 Sensor");
   delay(20000);
-  Serial.println("MQ-2 Sensor Ready!");
+  ESP_LOGI("Gas Sensor", "MQ-2 Sensor Ready!");
 }
 
 bool alertGasSensor()

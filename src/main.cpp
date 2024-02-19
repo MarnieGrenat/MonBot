@@ -3,89 +3,111 @@
 #include <WiFiClientSecure.h>
 #include <MQTT.h>
 #include "globals.h"
-#include "http_proto.h"
+#include "http_protocol.h"
 #include "sensors.h"
 
 /* Function Prototypes */
 void initSerial(uint32_t baudRate);
-
-void loadWiFiConfig();
+void presentDevice();
 void initWifi();
 void taskMaintainWifi(void*);
 void updateNetworkInfo();
 void initAccessPoint(const char* ssid, const char* psw);
+
 void taskMQTT(void*);
-void taskControl(void*);
 String mqttError(lwmqtt_err_t error);
 void sendMQTTMessage(String topic, String payload, uint8_t qos = 0);
 void treatReceivedMessage(String &topic, String &payload);
+
+
+void taskControl(void*);
 
 /* Variables */
 static MQTTClient *mqttClient;
 static WiFiClientSecure *wifiClientSecure;
 static WiFiClient *wifiClientUnsecured;
 
+/* Task Handles */
+TaskHandle_t taskHandle_WiFi;
+TaskHandle_t taskHandle_Control;
+TaskHandle_t taskHandle_MQTT;
 
 void setup() {
   while (!SPIFFS.begin(true))
   {
-    delay(1000);
+    taskWait(1000);
   }
+  ESP_LOGI("SETUP", "INIT SETUP.");
   initSerial(115200);
-  delay(1000);
+  taskWait(1000);
   Serial.flush();
+  presentDevice();
+  loadAPIConfig();
   initWifi();
 
   configDeviceTime();
 
-  Serial.println("Webserver initialized. IP Address: ");
-  Serial.println(WiFi.localIP());
-  Serial.println("Setup complete");
-  delay(1000);
-  xTaskCreate(taskMaintainWifi, "maintain WIFI", 4 * 1024, NULL, 2, NULL);
-  xTaskCreate(taskControl, "control", 10 * 1024, NULL, 2, NULL);
-  delay(10*1000);
+  ESP_LOGI("SETUP", "Webserver initialized. IP Address: ");
+  ESP_LOGI("SETUP", "%s", WiFi.localIP());
+  ESP_LOGI("SETUP", "Setup complete");
+  taskWait(1000);
+  xTaskCreate(taskControl, "control", 10 * 1024, NULL, 2, &taskHandle_Control);
+  taskWait(10*1000);
   sendAlert("Iniciando Monitoramento do Sistema.");
+  warmUpGasSensor();
 }
 
 void loop() {
   webserver.handleClient();
-  delay(500);
+  taskWait(500);
 }
 
 /* Serial */
 void initSerial(uint32_t baudRate)
 {
   Serial.begin(baudRate);
-  Serial.println("Serial initialized");
+  ESP_LOGI("SETUP", "Serial initialized");
 }
 
+void presentDevice()
+{
+  ESP_LOGI("SETUP", "************************************************");
+  ESP_LOGI("SETUP", "SPIFFS Access Initialized.");
+  ESP_LOGI("SETUP", "Initializing Device...");
+  // ESP_LOGI("SETUP", "Device: %s Version: %s" String(DEVICE), String(VERSION));
+  ESP_LOGI("SETUP", "************************************************");
+}
 /* Control */
 void taskControl(void*)
 {
-  warmUpGasSensor();
+  time_t lastMessage = time(nullptr);
   for(;;)
   {
     if (!isConnectedToInternet)
     {
+      taskWait(1000);
       continue;
     }
-
     if (goodMorningTime())
     {
-      float_t temperature = verifyTemperature();
-      float_t humidity = verifyHumidity();
-      String message = "Temperatura: " + String(temperature) + "C\nUmidade: " + String(humidity) + "%";
-      sendAlert("Bom dia!" + message + "\nTenha um ótimo dia hoje também!");
-      delay(10 * 1000);
+      reconfigTime();
+
+      String messageInfo = "\nTemperatura: " + String(verifyTemperature()) + "C\nUmidade: " + String(verifyHumidity()) + "%";
+      sendAlert("Bom dia!" + messageInfo + "\nTenha um ótimo dia hoje também!");
     }
     if (alertGasSensor())
     {
-      sendAlert("Alerta de Gás Detectado!\nNível de Gás: Alto\nAtenção! Não acenda luzes ao entrar no ambiente!\nVentile o ambiente e saia imediatamente!\nhttps://segredosdomundo.r7.com/vazamento-de-gas-o-que-fazer-quando-acontecer/");
+      if (lastMessage - time(nullptr) < 60 * 30)
+      {
+        taskWait(20 * 1000);
+        continue;
+      }
+      lastMessage = time(nullptr);
+      const char* gasAlert = "Atenção! Alerta!\nGás inflamável Detectado!\nNão acenda luzes ao entrar no ambiente!\nVentile o ambiente e saia imediatamente!\nDicas: https://encurtador.com.br/bsCKL";
+      sendAlert(gasAlert);
       sendMQTTMessage("Alerta", "Alerta de Gás Detectado!", 1);
-      delay(30 * 1000);
     }
-    taskWait(20 * 100);
+    taskWait(20 * 1000);
   }
   vTaskDelete(NULL);
 }
@@ -95,25 +117,35 @@ void initWifi()
 {
   WiFi.setSleep(0);
   WiFi.setAutoReconnect(0);
-  const char *ssid = wiFiConfig["ssid"];
-  const char *password = wiFiConfig["psw"];
+  loadWiFiConfig();
+  taskWait(100);
   const char *apSSID = wiFiConfig["apSSID"];
   const char *apPassword = wiFiConfig["apPassword"];
-
   initAccessPoint(apSSID, apPassword);
 
+  const char *ssid = wiFiConfig["ssid"];
+  const char *password = wiFiConfig["psw"];
+
+  if (password == "")
+  {
+    WiFi.begin(ssid);
+  }
+  if (ssid == "")
+  {
+    taskWait(10000);
+  }
   WiFi.begin(ssid, password);
 
-  Serial.print("Connecting to WiFi..");
-  if (WiFi.status() != WL_CONNECTED)
+  ESP_LOGI("Wi-Fi", "Connecting to WiFi..");
+  while (WiFi.status() != WL_CONNECTED)
   {
-    Serial.print(".");
-    delay(10000);
+    taskWait(1000);
   }
-  xTaskCreate(taskMaintainWifi, "maintain WIFI", 4 * 1024, NULL, 2, NULL);
-  xTaskCreate(taskMQTT, "connect to MQTT", 10 * 1024, NULL, 2, NULL);
+  xTaskCreate(taskMaintainWifi, "maintain WIFI", 4 * 1024, NULL, 2, &taskHandle_WiFi);
+  taskWait(1000);
+  xTaskCreate(taskMQTT, "connect to MQTT", 10 * 1024, NULL, 2, &taskHandle_MQTT);
 
-  delay(10000);
+  taskWait(10000);
   sendMQTTMessage("Status", "Dispositivo Conectado.", 1);
 }
 
@@ -122,7 +154,7 @@ void taskMaintainWifi(void *)
   if (WiFi.status() == WL_CONNECTED)
   {
     updateNetworkInfo();
-    Serial.println("\n\nConnected to WiFi: " + WiFi.SSID());
+    ESP_LOGI("Wi-Fi", "\nConnected to WiFi: %s", WiFi.SSID());
     sendAlert("Conectado a rede WiFi: " + WiFi.SSID());
   }
   for(;;)
@@ -130,12 +162,11 @@ void taskMaintainWifi(void *)
     isConnectedToInternet = (WiFi.status() == WL_CONNECTED);
     if (!isConnectedToInternet)
     {
-      Serial.println("WiFi connection lost. Reconnecting...");
+      ESP_LOGI("Wi-Fi", "Connection lost. Reconnecting...");
       WiFi.reconnect();
-      // sendAlert("Conexão WiFi perdida. Reconectando...");
       configDeviceTime();
     }
-    delay(10 * 1000);
+    taskWait(10 * 1000);
   }
   vTaskDelete(NULL);
 }
@@ -143,20 +174,21 @@ void taskMaintainWifi(void *)
 void updateNetworkInfo()
 {
   IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: " + ip.toString() + " Gateway: " + WiFi.gatewayIP().toString() + " Subnet Mask: " + WiFi.subnetMask().toString());
+  ESP_LOGI("Wi-Fi", "IP Address: %s Gateway: %s Subnet Mask: %s", ip.toString(), WiFi.gatewayIP().toString(), WiFi.subnetMask().toString());
 }
 
 void initAccessPoint(const char *ssid, const char *password)
 {
+
+  ESP_LOGI("Wi-Fi", "%s, %s", ssid, password);
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAPConfig(IPAddress(192, 168, 0, 10), IPAddress(192, 168, 0, 10), IPAddress(255, 255, 255, 240));
+  WiFi.softAPConfig(IPAddress(192, 168, 1, 1), IPAddress(192, 168, 1, 0), IPAddress(255, 255, 255, 0));
   WiFi.softAP(ssid, password, 1, 0, 2);
   initWebserver();
 
-  String apSSID = ssid;
-  Serial.println("Access Point initialized");
-  Serial.println("AP SSID: " + apSSID + " Password: " + password + " IP: " + WiFi.softAPIP().toString());
-  sendAlert("Ponto de Acesso Inicializado. SSID: " + apSSID + "\nIP: " + WiFi.softAPIP().toString());
+  ESP_LOGI("Access Point", "Webserver Initialized");
+  ESP_LOGI("Access Point", "Access IP: %s", WiFi.softAPIP().toString());
+  sendAlert("Ponto de Acesso Inicializado. SSID: " + String(ssid) + "\nIP: " + WiFi.softAPIP().toString());
 }
 
 void taskMQTT(void*)
@@ -166,6 +198,10 @@ void taskMQTT(void*)
   const uint16_t mqttPort = mqttConfig["mqttPort"].as<uint16_t>();
   const char* mqttUser = mqttConfig["mqttUser"].as<const char*>();
   const char* mqttPassword = mqttConfig["mqttPsw"].as<const char*>();
+  while (mqttServer == "")
+  {
+    taskWait(1000);
+  }
 
   mqttClient = new MQTTClient(8 * 1024);
   mqttClient->setKeepAlive(55);
@@ -192,18 +228,18 @@ void taskMQTT(void*)
     isConnectedToMQTT = mqttClient->connected();
     if (!isConnectedToMQTT)
     {
-      Serial.println("MQTT connection lost. Reconnecting...");
+      ESP_LOGI("MQTT", "Connection to Broker lost. Reconnecting...");
       while (!mqttClient->connect("Monitoramento", mqttUser, mqttPassword))
       {
-        Serial.println("Failed to reconnect to MQTT. Trying again in 10 seconds...");
-        Serial.print("MQTT Error: " + mqttError(mqttClient->lastError()));
+        ESP_LOGE("MQTT", "Failed to reconnect to Broker. Trying again in 10 seconds...");
+        ESP_LOGE("MQTT", "Connection Error: %s", mqttError(mqttClient->lastError()));
         mqttClient->loop();
-        delay(10000);
+        taskWait(10000);
       }
-      Serial.println("Reconnected to MQTT.");
+      ESP_LOGI("MQTT", "Reconnected to Broker.");
     }
     mqttClient->loop();
-    delay(10000);
+    taskWait(1000);
   }
   vTaskDelete(NULL);
 }
@@ -258,13 +294,12 @@ String mqttError(lwmqtt_err_t error)
       return "Unknown Error.";
       break;
   }
-  Serial.println("MQTT Error: " + error);
-  delay(10 * 1000);
+  taskWait(10 * 1000);
 }
 
 void sendMQTTMessage(String topic, String payload, uint8_t qos)
 {
-  if (mqttClient->connected())
+  if (isConnectedToMQTT)
   {
     mqttClient->publish(topic.c_str(), payload.c_str(), false, qos);
   }
@@ -272,23 +307,23 @@ void sendMQTTMessage(String topic, String payload, uint8_t qos)
 
 void treatReceivedMessage(String &topic, String &payload)
 {
-  Serial.println("Received message from topic: " + topic + " - " + payload);
+  ESP_LOGI("MQTT", "Received message from topic: %s - %s", topic, payload);
 
   if (topic == "command" && payload == "reboot")
   {
     sendAlert("Comando Recebido. Reiniciando o dispositivo.");
-    delay(1000);
+    taskWait(1000);
     ESP.restart();
   }
   else if (topic == "time" && payload == "update")
   {
-    Serial.println("Comando Recebido. Reconfigurando temporizador.");
-    delay(1000);
+    ESP_LOGI("MQTT","Comando Recebido. Reconfigurando temporizador.");
+    taskWait(1000);
     configDeviceTime();
   }
   else
   {
     sendAlert("Comando MQTT Desconhecido Recebido. Tópico/Payload:" + topic + " / " + payload);
-    Serial.println("Tópico não reconhecido.");
+    ESP_LOGE("MQTT", "Tópico não reconhecido.");
   }
 }
