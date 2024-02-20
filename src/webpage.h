@@ -236,12 +236,11 @@ const  char webpage[] = R"=====(
     type = "image/png">
   </section>
 
-  <section id="mainScreen" style="display:none">
     <header>
-      <h1>MonBot Dashboard</h1>
+      <h1 id="titleText">Loading Settings</h1>
     </header>
 
-    <div class="container">
+    <div id="mainScreen" class="container" style="display:none">
       <div class="tabs">
         <div id="liveDataTab" class="tab">Live Data</div>
         <div id="settingsTab" class="tab">MonBot Settings</div>
@@ -326,9 +325,8 @@ const  char webpage[] = R"=====(
     </div>
 
     <footer>
-      <p>Developer: Gabriela Dellamora Paim. Version:1.0.9</p>
+      <p><b>Developer:</b> Gabriela Dellamora. <b>Version:</b> 1.0.9</p>
     </footer>
-  </section>
 
   <script>
     var messagesContainer = document.getElementById('messages');
@@ -360,8 +358,8 @@ const  char webpage[] = R"=====(
 
     async function loadScreen() {
       await getDeviceSettings();
-
       document.getElementById("loadingScreen").style.display = "none";
+      document.getElementById("titleText").innerHTML = "MonBot Dashboard";
       document.getElementById("mainScreen").style.display = "flex";
     }
 
@@ -378,7 +376,7 @@ const  char webpage[] = R"=====(
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    loadScreen();
+    //loadScreen();
 
     function requireData() {
       var xhr = new XMLHttpRequest();
