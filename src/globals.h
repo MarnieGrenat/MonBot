@@ -1,14 +1,30 @@
 #ifndef globals_h
 #define globals_h
 
-#include "fileSystem.h"
+#include "file_system.h"
 #include <time.h>
+/* Defines */
 
+enum DEVICE_NAME
+{
+    MonBot_LITE = 0,
+    MonBot_BOSS,
+};
+#define DEVICE MonBot_LITE
+#define VERSION "1.0.9"
+
+#define ever ;;
 /* Macros */
 #define taskWait(X) vTaskDelay(X / portTICK_PERIOD_MS)
+#define TASK_HIGH_WATERMARK() \
+do { \
+    uint32_t highWatermark = uxTaskGetStackHighWaterMark(NULL); \
+    if (highWatermark < __UINT32_MAX__) { \
+        ESP_LOGI("Usage of Memory", "FREE MEMORY : %u", highWatermark); \
+    } \
+} while (0)
 
 /* WS Terminal */
-
 bool isConnectedToInternet = false;
 bool isConnectedToMQTT = false;
 
